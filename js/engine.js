@@ -28,7 +28,12 @@ var Engine = (function (global) {
     canvas.height = 606;
     doc.body.appendChild(canvas);
 
-    let current_scene = menu;
+    let current_scene = scene;
+
+    global.change_scene = function(to) {
+        to.init();
+        current_scene = to;
+    }
 
     /* This function serves as the kickoff point for the game loop itself
      * and handles properly calling the update and render methods.

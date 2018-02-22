@@ -142,6 +142,23 @@ Stage.prototype.render = function () {
      * and, using the rowImages array, draw the correct image for that
      * portion of the "grid"
      */
+
+    const map = `wwwww
+                 ggggg
+                 ggggg
+                 ggssg
+                 ggggg
+                 ggggg`.replace(/\s+/g, '');
+    // debugger;?
+
+    const tile_image = {
+        'g' : 'images/grass-block.png',
+        's' : 'images/stone-block.png',
+        'w' : 'images/water-block.png'};
+
+    // for(i = 0; i < numRows * numCols; i++){
+
+    // }
     for (row = 0; row < numRows; row++) {
         for (col = 0; col < numCols; col++) {
             /* The drawImage function of the canvas' context element
@@ -151,7 +168,8 @@ Stage.prototype.render = function () {
              * so that we get the benefits of caching these images, since
              * we're using them over and over.
              */
-            ctx.drawImage(Resources.get(rowImages[row]), col * 101, row * 83);
+            const tile = map.charAt((row * numCols) + col);
+            ctx.drawImage(Resources.get(tile_image[tile]), col * 101, row * 83);
         }
     }
 }
@@ -217,18 +235,22 @@ Scene.prototype.reset = function () {
 }
 
 let scene = new Scene();
-
+let time = 0;
 let menu = {
     init: function () {
         //init here
     },
     update: function (dt) {
         //update here
+        time += dt;
+        if(time > 5) {
+            change_scene(scene);
+        }
     },
     render: function () {
         //render here
         ctx.font = "48px serif";
-        ctx.strokeText("Hello world", 50, 100);
+        ctx.fillText("Hello world", 50, 100);
     },
     reset: function () {
         //reset
