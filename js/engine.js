@@ -13,7 +13,7 @@
  * writing app.js a little simpler to work with.
  */
 
-var Engine = (function(global) {
+var Engine = (function (global) {
     /* Predefine the variables we'll be using within this scope,
      * create the canvas element, grab the 2D context for that canvas
      * set the canvas elements height/width and add it to the DOM.
@@ -79,7 +79,7 @@ var Engine = (function(global) {
      */
     function update(dt) {
         updateEntities(dt);
-        // checkCollisions();
+        checkCollisions();
     }
 
     /* This is called by the update function and loops through all of the
@@ -90,10 +90,43 @@ var Engine = (function(global) {
      * render methods.
      */
     function updateEntities(dt) {
-        allEnemies.forEach(function(enemy) {
+        allEnemies.forEach(function (enemy) {
             enemy.update(dt);
         });
         player.update();
+    }
+
+    var colliding = [];
+    function checkCollisions() {
+        allEnemies.forEach(function (enemy) {
+            let player_left = player.x + block.width < enemy.x;
+            let player_right = player.x > enemy.x + block.width;
+            let player_above = player.y + block.height < enemy.y;
+            let player_below = player.y > enemy.y + block.height;
+            let hitting = !(player_left || player_right || player_above || player_below);
+            let collision_pair = {x: player, y: enemy};
+            
+            let already_colliding = false;
+            colliding.forEach(function (pair){
+                if(pair.x === collision_pair.x && pair.y === collision_pair.y) {
+                    already_colliding = true;
+                }
+            });
+
+            if (hitting) {
+                if (!already_colliding) {
+                    //collision hasn't been dealt with yet
+                    colliding.push(collision_pair);
+                    player.hit(enemy);                    
+                }
+            } else {
+                //if two things are not colliding, ensure they arent in the collision
+                colliding = colliding.filter(function (pair) {
+                    return !(pair.x === collision_pair.x && pair.y === collision_pair.y);
+                });
+            }
+        });
+
     }
 
     /* This function initially draws the "game level", it will then call
@@ -107,19 +140,19 @@ var Engine = (function(global) {
          * for that particular row of the game level.
          */
         var rowImages = [
-                'images/water-block.png',   // Top row is water
-                'images/stone-block.png',   // Row 1 of 3 of stone
-                'images/stone-block.png',   // Row 2 of 3 of stone
-                'images/stone-block.png',   // Row 3 of 3 of stone
-                'images/grass-block.png',   // Row 1 of 2 of grass
-                'images/grass-block.png'    // Row 2 of 2 of grass
-            ],
+            'images/water-block.png',   // Top row is water
+            'images/stone-block.png',   // Row 1 of 3 of stone
+            'images/stone-block.png',   // Row 2 of 3 of stone
+            'images/stone-block.png',   // Row 3 of 3 of stone
+            'images/grass-block.png',   // Row 1 of 2 of grass
+            'images/grass-block.png'    // Row 2 of 2 of grass
+        ],
             numRows = 6,
             numCols = 5,
             row, col;
-        
+
         // Before drawing, clear existing canvas
-        ctx.clearRect(0,0,canvas.width,canvas.height)
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         /* Loop through the number of rows and columns we've defined above
          * and, using the rowImages array, draw the correct image for that
@@ -149,7 +182,7 @@ var Engine = (function(global) {
         /* Loop through all of the objects within the allEnemies array and call
          * the render function you have defined.
          */
-        allEnemies.forEach(function(enemy) {
+        allEnemies.forEach(function (enemy) {
             enemy.render();
         });
 
@@ -173,7 +206,9 @@ var Engine = (function(global) {
         'images/water-block.png',
         'images/grass-block.png',
         'images/enemy-bug.png',
-        'images/char-boy.png'
+        'images/enemy-bug-flipped.png',
+        'images/char-boy.png',
+        'images/char-boy-box.png'
     ]);
     Resources.onReady(init);
 
