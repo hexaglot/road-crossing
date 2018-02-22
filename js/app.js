@@ -167,39 +167,39 @@ Scene.prototype.init = function () {
 }
 
 Scene.prototype.update = function (dt) {
-        allEnemies.forEach(function (enemy) {
-            enemy.update(dt);
-        });
-        player.update();
-        var that = this;
-        allEnemies.forEach(function (enemy) {
-            let player_left = player.x + block.width < enemy.x;
-            let player_right = player.x > enemy.x + block.width;
-            let player_above = player.y + block.height < enemy.y;
-            let player_below = player.y > enemy.y + block.height;
-            let hitting = !(player_left || player_right || player_above || player_below);
-            let collision_pair = { x: player, y: enemy };
+    allEnemies.forEach(function (enemy) {
+        enemy.update(dt);
+    });
+    player.update();
+    var that = this;
+    allEnemies.forEach(function (enemy) {
+        let player_left = player.x + block.width < enemy.x;
+        let player_right = player.x > enemy.x + block.width;
+        let player_above = player.y + block.height < enemy.y;
+        let player_below = player.y > enemy.y + block.height;
+        let hitting = !(player_left || player_right || player_above || player_below);
+        let collision_pair = { x: player, y: enemy };
 
-            let already_colliding = false;
-            that.colliding.forEach(function (pair) {
-                if (pair.x === collision_pair.x && pair.y === collision_pair.y) {
-                    already_colliding = true;
-                }
-            });
-
-            if (hitting) {
-                if (!already_colliding) {
-                    //collision hasn't been dealt with yet
-                    that.colliding.push(collision_pair);
-                    player.hit(enemy);
-                }
-            } else {
-                //if two things are not colliding, ensure they arent in the collision
-                that.colliding = that.colliding.filter(function (pair) {
-                    return !(pair.x === collision_pair.x && pair.y === collision_pair.y);
-                });
+        let already_colliding = false;
+        that.colliding.forEach(function (pair) {
+            if (pair.x === collision_pair.x && pair.y === collision_pair.y) {
+                already_colliding = true;
             }
         });
+
+        if (hitting) {
+            if (!already_colliding) {
+                //collision hasn't been dealt with yet
+                that.colliding.push(collision_pair);
+                player.hit(enemy);
+            }
+        } else {
+            //if two things are not colliding, ensure they arent in the collision
+            that.colliding = that.colliding.filter(function (pair) {
+                return !(pair.x === collision_pair.x && pair.y === collision_pair.y);
+            });
+        }
+    });
 }
 
 Scene.prototype.render = function () {
@@ -217,3 +217,20 @@ Scene.prototype.reset = function () {
 }
 
 let scene = new Scene();
+
+let menu = {
+    init: function () {
+        //init here
+    },
+    update: function (dt) {
+        //update here
+    },
+    render: function () {
+        //render here
+        ctx.font = "48px serif";
+        ctx.strokeText("Hello world", 50, 100);
+    },
+    reset: function () {
+        //reset
+    }
+};
