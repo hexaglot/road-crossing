@@ -2,7 +2,7 @@ const UNIT = 101;
 
 const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
-const canvas = {width: 505, height: 606};
+const canvas = { width: 505, height: 606 };
 var allEnemies = [];
 
 function clamp(n, min, max) {
@@ -120,40 +120,100 @@ var Stage = function () {
 
 }
 
-Stage.prototype.render = function() {
-        /* This array holds the relative URL to the image used
-         * for that particular row of the game level.
-         */
-        var rowImages = [
-            'images/water-block.png',   // Top row is water
-            'images/stone-block.png',   // Row 1 of 3 of stone
-            'images/stone-block.png',   // Row 2 of 3 of stone
-            'images/stone-block.png',   // Row 3 of 3 of stone
-            'images/grass-block.png',   // Row 1 of 2 of grass
-            'images/grass-block.png'    // Row 2 of 2 of grass
-        ],
-            numRows = 6,
-            numCols = 5;
+Stage.prototype.render = function () {
+    /* This array holds the relative URL to the image used
+     * for that particular row of the game level.
+     */
+    var rowImages = [
+        'images/water-block.png',   // Top row is water
+        'images/stone-block.png',   // Row 1 of 3 of stone
+        'images/stone-block.png',   // Row 2 of 3 of stone
+        'images/stone-block.png',   // Row 3 of 3 of stone
+        'images/grass-block.png',   // Row 1 of 2 of grass
+        'images/grass-block.png'    // Row 2 of 2 of grass
+    ],
+        numRows = 6,
+        numCols = 5;
 
-        // Before drawing, clear existing canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Before drawing, clear existing canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        /* Loop through the number of rows and columns we've defined above
-         * and, using the rowImages array, draw the correct image for that
-         * portion of the "grid"
-         */
-        for (row = 0; row < numRows; row++) {
-            for (col = 0; col < numCols; col++) {
-                /* The drawImage function of the canvas' context element
-                 * requires 3 parameters: the image to draw, the x coordinate
-                 * to start drawing and the y coordinate to start drawing.
-                 * We're using our Resources helpers to refer to our images
-                 * so that we get the benefits of caching these images, since
-                 * we're using them over and over.
-                 */
-                ctx.drawImage(Resources.get(rowImages[row]), col * 101, row * 83);
-            }
+    /* Loop through the number of rows and columns we've defined above
+     * and, using the rowImages array, draw the correct image for that
+     * portion of the "grid"
+     */
+    for (row = 0; row < numRows; row++) {
+        for (col = 0; col < numCols; col++) {
+            /* The drawImage function of the canvas' context element
+             * requires 3 parameters: the image to draw, the x coordinate
+             * to start drawing and the y coordinate to start drawing.
+             * We're using our Resources helpers to refer to our images
+             * so that we get the benefits of caching these images, since
+             * we're using them over and over.
+             */
+            ctx.drawImage(Resources.get(rowImages[row]), col * 101, row * 83);
         }
+    }
 }
 
 var stage = new Stage();
+
+var Scene = function () {
+    this.colliding = [];
+}
+
+Scene.prototype.init = function () {
+
+}
+
+Scene.prototype.update = function (dt) {
+        allEnemies.forEach(function (enemy) {
+            enemy.update(dt);
+        });
+        player.update();
+        var that = this;
+        allEnemies.forEach(function (enemy) {
+            let player_left = player.x + block.width < enemy.x;
+            let player_right = player.x > enemy.x + block.width;
+            let player_above = player.y + block.height < enemy.y;
+            let player_below = player.y > enemy.y + block.height;
+            let hitting = !(player_left || player_right || player_above || player_below);
+            let collision_pair = { x: player, y: enemy };
+
+            let already_colliding = false;
+            that.colliding.forEach(function (pair) {
+                if (pair.x === collision_pair.x && pair.y === collision_pair.y) {
+                    already_colliding = true;
+                }
+            });
+
+            if (hitting) {
+                if (!already_colliding) {
+                    //collision hasn't been dealt with yet
+                    that.colliding.push(collision_pair);
+                    player.hit(enemy);
+                }
+            } else {
+                //if two things are not colliding, ensure they arent in the collision
+                that.colliding = that.colliding.filter(function (pair) {
+                    return !(pair.x === collision_pair.x && pair.y === collision_pair.y);
+                });
+            }
+        });
+}
+
+Scene.prototype.render = function () {
+    stage.render();
+
+    allEnemies.forEach(function (enemy) {
+        enemy.render();
+    });
+
+    player.render();
+}
+
+Scene.prototype.reset = function () {
+    //no-op
+}
+
+let scene = new Scene();
