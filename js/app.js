@@ -7,11 +7,18 @@ var allEnemies = [];
 
 const toMap = (str) => { return str.replace(/\s+/g, '') }
 const map = toMap(`wwwww
-                  ggggg
-                  ggggg
-                  ggssg
-                  ggggg
-                  ggggg`);
+                   ggggg
+                   sssss
+                   ggggg
+                   sssss
+                   ggggg`);
+
+const rocks = toMap(`_____
+                     rrr_r
+                     _____
+                     _____
+                     _____
+                     _____`);
 
 function clamp(n, min, max) {
     //ensure a value min or greater and max or smaller
@@ -49,7 +56,7 @@ Enemy.prototype.update = function (dt) {
     // You should multiply any movement by the dt parameter
     // which will ensure the game runs at the same speed for
     // all computers.
-    this.x = this.x + (area.width * this.speed * dt);
+    this.x = this.x + (block.width * this.speed * dt);
 };
 
 // Draw the enemy on the screen, required method for game
@@ -85,7 +92,8 @@ Player.prototype.update = function () {
     this.row = Math.floor(this.y / block.height);
 
     const current_grid = map.charAt((this.row * area.cols) + this.col);
-    if(current_grid === 'w') {
+    const current_rocks = rocks.charAt((this.row * area.cols) + this.col)
+    if (current_grid === 'w' || current_rocks === 'r') {
         this.x = x;
         this.y = y;
     }
@@ -154,6 +162,14 @@ Stage.prototype.render = function () {
             ctx.drawImage(Resources.get(tile_image[tile]), col * 101, row * 83);
         }
     }
+
+    for (row = 0; row < area.rows; row++) {
+        for (col = 0; col < area.cols; col++) {
+            if (rocks.charAt((row * area.cols) + col) === 'r') {
+                ctx.drawImage(Resources.get('images/Rock.png'), col * 101, (row * 83) - (block.height/2));
+            }
+        }
+    }
 }
 
 var stage = new Stage();
@@ -171,33 +187,13 @@ Scene.prototype.update = function (dt) {
         enemy.update(dt);
     });
     player.update();
+
     var that = this;
     allEnemies.forEach(function (enemy) {
-        let player_left = player.x + block.width < enemy.x;
-        let player_right = player.x > enemy.x + block.width;
-        let player_above = player.y + block.height < enemy.y;
-        let player_below = player.y > enemy.y + block.height;
-        let hitting = !(player_left || player_right || player_above || player_below);
-        let collision_pair = { x: player, y: enemy };
-
-        let already_colliding = false;
-        that.colliding.forEach(function (pair) {
-            if (pair.x === collision_pair.x && pair.y === collision_pair.y) {
-                already_colliding = true;
-            }
-        });
-
-        if (hitting) {
-            if (!already_colliding) {
-                //collision hasn't been dealt with yet
-                that.colliding.push(collision_pair);
-                player.hit(enemy);
-            }
-        } else {
-            //if two things are not colliding, ensure they arent in the collision
-            that.colliding = that.colliding.filter(function (pair) {
-                return !(pair.x === collision_pair.x && pair.y === collision_pair.y);
-            });
+        if ((Math.abs(player.x - enemy.x) < block.width) &&
+            (Math.abs(player.y - enemy.y) < block.height)) {
+            console.log('Collision!');
+            player.hit(enemy);
         }
     });
 }

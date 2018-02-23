@@ -90,6 +90,7 @@ var Engine = (function (global) {
         'images/enemy-bug.png',
         'images/enemy-bug-flipped.png',
         'images/char-boy.png',
+        'images/Rock.png',
         'images/char-boy-box.png'
     ]);
     Resources.onReady(init);
