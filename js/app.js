@@ -1,24 +1,6 @@
-
-
 const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
-var allEnemies = [];
-
-const toMap = (str) => { return str.replace(/\s+/g, '') }
-const map = toMap(`wwwww
-                   ggggg
-                   sssss
-                   ggggg
-                   sssss
-                   ggggg`);
-
-const rocks = toMap(`_____
-                     rrr_r
-                     _____
-                     _____
-                     _____
-                     _____`);
 
 function clamp(n, min, max) {
     //ensure a value min or greater and max or smaller
@@ -47,7 +29,6 @@ var Enemy = function (row, speed, dir) {
         this.sprite = 'images/enemy-bug-flipped.png';
     }
     this.y = block.height * row;
-    console.log('y:', this.y);
 };
 
 // Update the enemy's position, required method for game
@@ -68,13 +49,15 @@ Enemy.prototype.render = function () {
 // Now write your own player class
 // This class requires an update(), render() and
 // a handleInput() method.
-var Player = function () {
+var Player = function (map, rocks) {
     //this.sprite = 'images/char-boy.png';
     this.sprite = 'images/char-boy.png';
     this.x = 2 * block.width;
     this.y = 5 * block.height;
     this.xVel = 0;
     this.yVel = 0;
+    this.map = map;
+    this.rocks = rocks;
 }
 
 Player.prototype.update = function () {
@@ -91,8 +74,8 @@ Player.prototype.update = function () {
     this.col = Math.floor(this.x / block.width);
     this.row = Math.floor(this.y / block.height);
 
-    const current_grid = map.charAt((this.row * area.cols) + this.col);
-    const current_rocks = rocks.charAt((this.row * area.cols) + this.col)
+    const current_grid = this.map.charAt((this.row * area.cols) + this.col);
+    const current_rocks = this.rocks.charAt((this.row * area.cols) + this.col)
     if (current_grid === 'w' || current_rocks === 'r') {
         this.x = x;
         this.y = y;
@@ -116,32 +99,27 @@ Player.prototype.handleInput = function (key) {
 }
 
 Player.prototype.hit = function (enemy) {
-    console.log("The player hit an enemy!");
     this.sprite = (this.sprite === 'images/char-boy-box.png') ? 'images/char-boy.png' : 'images/char-boy-box.png';
 }
 
-// Now instantiate your objects.
-// Place all enemy objects in an array called allEnemies
-// Place the player object in a variable called player
-var player = new Player();
-var allEnemies = [new Enemy(2, 1, 1), new Enemy(0, 1.5, 1), new Enemy(5, 1.2, -1)];
-
-
-// This listens for key presses and sends the keys to your
-// Player.handleInput() method. You don't need to modify this.
-document.addEventListener('keyup', function (e) {
-    var allowedKeys = {
-        37: 'left',
-        38: 'up',
-        39: 'right',
-        40: 'down'
-    };
-
-    player.handleInput(allowedKeys[e.keyCode]);
-});
-
-
 var Stage = function () {
+    const toMap = (str) => { return str.replace(/\s+/g, '') }
+    this.map = toMap(`wwwgw
+                   ggggg
+                   sssss
+                   ggggg
+                   sssss
+                   ggggg`);
+
+    this.rocks = toMap(`___x_
+                     rrr_r
+                     _____
+                     _____
+                     _____
+                     _____`);
+    const s_index = this.rocks.indexOf('x');
+    this.star = {col: Math.floor(s_index % area.cols), row: Math.floor(s_index / area.cols)};
+    console.log(this.star);
 
 }
 
@@ -155,82 +133,129 @@ Stage.prototype.render = function () {
         'w': 'images/water-block.png'
     };
 
+    const fg_image = {
+        'r': 'images/Rock.png',
+        'x': 'images/Star.png'
+    };
+
 
     for (row = 0; row < area.rows; row++) {
         for (col = 0; col < area.cols; col++) {
-            const tile = map.charAt((row * area.cols) + col);
+            const tile = this.map.charAt((row * area.cols) + col);
             ctx.drawImage(Resources.get(tile_image[tile]), col * 101, row * 83);
         }
     }
 
     for (row = 0; row < area.rows; row++) {
         for (col = 0; col < area.cols; col++) {
-            if (rocks.charAt((row * area.cols) + col) === 'r') {
-                ctx.drawImage(Resources.get('images/Rock.png'), col * 101, (row * 83) - (block.height/2));
+            const fg = this.rocks.charAt((row * area.cols) + col);
+            if (fg_image[fg]) {
+                ctx.drawImage(Resources.get(fg_image[fg]), col * 101, (row * 83) - (block.height / 2));
             }
         }
     }
 }
 
-var stage = new Stage();
+
 
 var Scene = function () {
-    this.colliding = [];
+    this.stage = new Stage();
+    this.player = new Player(this.stage.map, this.stage.rocks);
+    this.allEnemies = [new Enemy(2, 1, 1), new Enemy(0, 1.5, 1), new Enemy(5, 1.2, -1)];
+
+    this.level_time = 0;
+    this.next_enemy = 0;
+
+    this.level = 0;
 }
 
 Scene.prototype.init = function () {
+    // This listens for key presses and sends the keys to your
+    // Player.handleInput() method. You don't need to modify this.
+    let player = this.player;
+    document.addEventListener('keyup', function (e) {
+        var allowedKeys = {
+            37: 'left',
+            38: 'up',
+            39: 'right',
+            40: 'down'
+        };
 
+        player.handleInput(allowedKeys[e.keyCode]);
+    });
 }
 
 Scene.prototype.update = function (dt) {
-    allEnemies.forEach(function (enemy) {
+    var that = this;
+    //total time in level
+    this.level_time += dt;
+    //update the enemies one by one
+    this.allEnemies.forEach(function (enemy) {
         enemy.update(dt);
     });
-    player.update();
 
-    var that = this;
-    allEnemies.forEach(function (enemy) {
-        if ((Math.abs(player.x - enemy.x) < block.width) &&
-            (Math.abs(player.y - enemy.y) < block.height)) {
-            console.log('Collision!');
-            player.hit(enemy);
+    //update player 
+    this.player.update();
+
+    //check for player/enemy collisions
+    this.allEnemies.forEach(function (enemy) {
+        if ((Math.abs(that.player.x - enemy.x) < block.width) &&
+            (Math.abs(that.player.y - enemy.y) < block.height)) {
+            that.player.hit(enemy);
         }
     });
+
+    //check for player/star collisions
+    if (this.player.col === this.stage.star.col &&
+        this.player.row === this.stage.star.row){
+        change_scene(new Scene()); //crazy idea?
+        return;
+    }
+    //remove enemies which have left the screen
+    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.x < area.width) && (enemy.x > 0 - block.width - 1)));
+
+    //every 5s add a new enemy
+    if (this.level_time > this.next_enemy) {
+        this.allEnemies.push(new Enemy(2, 1, 1));
+        this.next_enemy = this.level_time + 5;
+    }
 }
 
 Scene.prototype.render = function () {
-    stage.render();
+    this.stage.render();
 
-    allEnemies.forEach(function (enemy) {
+    this.allEnemies.forEach(function (enemy) {
         enemy.render();
     });
 
-    player.render();
+    this.player.render();
 }
 
 Scene.prototype.reset = function () {
     //no-op
+    this.level_time = 0;
 }
 
 let scene = new Scene();
-let time = 0;
-let menu = {
-    init: function () {
-        //init here
-    },
-    update: function (dt) {
+
+let menu = (function () {
+    let obj = {};
+
+    let time = 0;
+
+    obj.update = function (dt) {
         //update here
         time += dt;
         if (time > 5) {
             change_scene(scene);
         }
-    },
-    render: function () {
+    };
+
+    obj.render = function () {
         //render here
         ctx.font = "48px serif";
         ctx.fillText("Hello world", 50, 100);
-    },
-    reset: function () {
-        //reset
     }
-};
+
+    return obj;
+}());

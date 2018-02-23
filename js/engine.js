@@ -30,7 +30,7 @@ var Engine = (function (global) {
 
     let current_scene = scene;
 
-    global.change_scene = function(to) {
+    global.change_scene = function (to) {
         to.init();
         current_scene = to;
     }
@@ -50,6 +50,7 @@ var Engine = (function (global) {
 
         /* Call our update/render functions, pass along the time delta to
          * our update function since it may be used for smooth animation.
+         * Only call them if they have been declared
          */
         current_scene.update(dt);
         current_scene.render();
@@ -70,13 +71,11 @@ var Engine = (function (global) {
      * game loop.
      */
     function init() {
+        //we are only going to call reset if its been declared
         current_scene.reset();
+        current_scene.init();
         lastTime = Date.now();
         main();
-    }
-
-    function reset() {
-        current_scene.reset();
     }
 
     /* Go ahead and load all of the images we know we're going to need to
@@ -91,6 +90,7 @@ var Engine = (function (global) {
         'images/enemy-bug-flipped.png',
         'images/char-boy.png',
         'images/Rock.png',
+        'images/Star.png',
         'images/char-boy-box.png'
     ]);
     Resources.onReady(init);
