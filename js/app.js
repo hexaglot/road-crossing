@@ -1,9 +1,17 @@
-const UNIT = 101;
+
 
 const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
 var allEnemies = [];
+
+const toMap = (str) => { return str.replace(/\s+/g, '') }
+const map = toMap(`wwwww
+                  ggggg
+                  ggggg
+                  ggssg
+                  ggggg
+                  ggggg`);
 
 function clamp(n, min, max) {
     //ensure a value min or greater and max or smaller
@@ -41,7 +49,7 @@ Enemy.prototype.update = function (dt) {
     // You should multiply any movement by the dt parameter
     // which will ensure the game runs at the same speed for
     // all computers.
-    this.x = this.x + (UNIT * this.speed * dt);
+    this.x = this.x + (area.width * this.speed * dt);
 };
 
 // Draw the enemy on the screen, required method for game
@@ -56,8 +64,8 @@ Enemy.prototype.render = function () {
 var Player = function () {
     //this.sprite = 'images/char-boy.png';
     this.sprite = 'images/char-boy.png';
-    this.x = 0;
-    this.y = 0;
+    this.x = 2 * block.width;
+    this.y = 5 * block.height;
     this.xVel = 0;
     this.yVel = 0;
 }
@@ -72,6 +80,15 @@ Player.prototype.update = function () {
     //reset the velocity
     this.xVel = 0;
     this.yVel = 0;
+
+    this.col = Math.floor(this.x / block.width);
+    this.row = Math.floor(this.y / block.height);
+
+    const current_grid = map.charAt((this.row * area.cols) + this.col);
+    if(current_grid === 'w') {
+        this.x = x;
+        this.y = y;
+    }
 }
 
 Player.prototype.render = function () {
@@ -121,54 +138,19 @@ var Stage = function () {
 }
 
 Stage.prototype.render = function () {
-    /* This array holds the relative URL to the image used
-     * for that particular row of the game level.
-     */
-    var rowImages = [
-        'images/water-block.png',   // Top row is water
-        'images/stone-block.png',   // Row 1 of 3 of stone
-        'images/stone-block.png',   // Row 2 of 3 of stone
-        'images/stone-block.png',   // Row 3 of 3 of stone
-        'images/grass-block.png',   // Row 1 of 2 of grass
-        'images/grass-block.png'    // Row 2 of 2 of grass
-    ],
-        numRows = 6,
-        numCols = 5;
-
     // Before drawing, clear existing canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    /* Loop through the number of rows and columns we've defined above
-     * and, using the rowImages array, draw the correct image for that
-     * portion of the "grid"
-     */
-
-    const map = `wwwww
-                 ggggg
-                 ggggg
-                 ggssg
-                 ggggg
-                 ggggg`.replace(/\s+/g, '');
-    // debugger;?
-
     const tile_image = {
-        'g' : 'images/grass-block.png',
-        's' : 'images/stone-block.png',
-        'w' : 'images/water-block.png'};
+        'g': 'images/grass-block.png',
+        's': 'images/stone-block.png',
+        'w': 'images/water-block.png'
+    };
 
-    // for(i = 0; i < numRows * numCols; i++){
 
-    // }
-    for (row = 0; row < numRows; row++) {
-        for (col = 0; col < numCols; col++) {
-            /* The drawImage function of the canvas' context element
-             * requires 3 parameters: the image to draw, the x coordinate
-             * to start drawing and the y coordinate to start drawing.
-             * We're using our Resources helpers to refer to our images
-             * so that we get the benefits of caching these images, since
-             * we're using them over and over.
-             */
-            const tile = map.charAt((row * numCols) + col);
+    for (row = 0; row < area.rows; row++) {
+        for (col = 0; col < area.cols; col++) {
+            const tile = map.charAt((row * area.cols) + col);
             ctx.drawImage(Resources.get(tile_image[tile]), col * 101, row * 83);
         }
     }
@@ -243,7 +225,7 @@ let menu = {
     update: function (dt) {
         //update here
         time += dt;
-        if(time > 5) {
+        if (time > 5) {
             change_scene(scene);
         }
     },
