@@ -1,34 +1,59 @@
 const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
+const grid = { x: 0, y: 0, width: 505, height: 606 }
 
-function clamp(n, min, max) {
-    //ensure a value min or greater and max or smaller
-    let r = n < min ? min : n;
-    r = r > max ? max : r;
-    return r;
+
+var Tile = function () {
+    this.x = 0;
+    this.y = 0;
+    this.width = 101;
+    this.height = 83;
+    this.sprite = '';
+    this.offset = true;
+};
+
+Tile.prototype.col = function () {
+    return Math.floor((this.x + (this.width / 2)) / this.width);
+}
+
+Tile.prototype.row = function () {
+    return Math.floor((this.y + (this.height / 2)) / this.height);
+}
+
+Tile.prototype.setRow = function (row) {
+    this.y = row * this.height;
+}
+
+Tile.prototype.setCol = function (col) {
+    this.x = col * this.width;
+}
+
+Tile.prototype.render = function () {
+    //we use an offset of half height to render characters
+    //bg use an offset of 0
+    //bit hacky
+    if (this.sprite) {
+        var img = Resources.get(this.sprite);
+        let offset = this.offset ? this.height / 2 : 0;
+        ctx.drawImage(img, this.x, this.y - offset);
+    }
 }
 
 // Enemies our player must avoid
 var Enemy = function (row, speed, dir) {
-    // Variables applied to each of our instances go here,
-    // we've provided one for you to get started
-
-    // The image/sprite for our enemies, this uses
-    // a helper we've provided to easily load images
     this.dir = dir;
     this.speed = speed * dir;
     this.row = row;
+    this.tile = new Tile();
     if (dir > 0) {
-        this.x = - block.width;
-        // this.sprite = 'images/enemy-bug.png';
-        this.sprite = 'images/enemy-bug.png';
+        this.tile.setCol(-1);
+        this.tile.sprite = 'images/enemy-bug.png';
     } else {
-        this.x = block.width * 6;
-        // this.sprite = 'images/enemy-bug-flipped.png';
-        this.sprite = 'images/enemy-bug-flipped.png';
+        this.tile.setCol(5 + 1);
+        this.tile.sprite = 'images/enemy-bug-flipped.png';
     }
-    this.y = block.height * row;
+    this.tile.setRow(row);
 };
 
 // Update the enemy's position, required method for game
@@ -37,53 +62,35 @@ Enemy.prototype.update = function (dt) {
     // You should multiply any movement by the dt parameter
     // which will ensure the game runs at the same speed for
     // all computers.
-    this.x = this.x + (block.width * this.speed * dt);
+    this.tile.x = this.tile.x + (this.tile.width * this.speed * dt);
 };
 
 // Draw the enemy on the screen, required method for game
 Enemy.prototype.render = function () {
-    var img = Resources.get(this.sprite);
-    ctx.drawImage(img, this.x, this.y - (block.height / 2));
+    this.tile.render();
 };
 
 // Now write your own player class
 // This class requires an update(), render() and
 // a handleInput() method.
-var Player = function (map, rocks) {
-    //this.sprite = 'images/char-boy.png';
-    this.sprite = 'images/char-boy.png';
-    this.x = 2 * block.width;
-    this.y = 5 * block.height;
+var Player = function () {
+    this.tile = new Tile();
+    this.tile.sprite = 'images/char-boy.png';
     this.xVel = 0;
     this.yVel = 0;
-    this.map = map;
-    this.rocks = rocks;
 }
 
 Player.prototype.update = function () {
-    let x = this.x;
-    let y = this.y;
-
-    this.x = clamp(x + (this.xVel * block.width), 0, area.width - block.width);
-    this.y = clamp(y + (this.yVel * block.height), 0, area.height - block.height);
+    this.tile.x = this.tile.x + (this.xVel * block.width);
+    this.tile.y = this.tile.y + (this.yVel * block.height)
 
     //reset the velocity
     this.xVel = 0;
     this.yVel = 0;
-
-    this.col = Math.floor(this.x / block.width);
-    this.row = Math.floor(this.y / block.height);
-
-    const current_grid = this.map.charAt((this.row * area.cols) + this.col);
-    const current_rocks = this.rocks.charAt((this.row * area.cols) + this.col)
-    if (current_grid === 'w' || current_rocks === 'r') {
-        this.x = x;
-        this.y = y;
-    }
 }
 
 Player.prototype.render = function () {
-    ctx.drawImage(Resources.get(this.sprite), this.x, this.y - (block.height / 2));
+    this.tile.render();
 }
 
 Player.prototype.handleInput = function (key) {
@@ -99,68 +106,86 @@ Player.prototype.handleInput = function (key) {
 }
 
 Player.prototype.hit = function (enemy) {
-    this.sprite = (this.sprite === 'images/char-boy-box.png') ? 'images/char-boy.png' : 'images/char-boy-box.png';
+    console.log('collide');
 }
 
 var Stage = function () {
-    const toMap = (str) => { return str.replace(/\s+/g, '') }
-    this.map = toMap(`wwwgw
+    this.fg = this.bulidLayer(`___x_
+                             r_r_r
+                             _____
+                             __r__
+                             _____
+                             p____`);
+    this.bg = this.bulidLayer(`wwwgw
                    ggggg
                    sssss
                    ggggg
                    sssss
                    ggggg`);
 
-    this.rocks = toMap(`___x_
-                     rrr_r
-                     _____
-                     _____
-                     _____
-                     _____`);
-    const s_index = this.rocks.indexOf('x');
-    this.star = {col: Math.floor(s_index % area.cols), row: Math.floor(s_index / area.cols)};
-    console.log(this.star);
+    this.star = this.fg.find(tile => tile.type === 'star');
+    this.player_start = this.fg.find(tile => tile.type === 'player_start');
+};
 
+Stage.prototype.bulidLayer = function (map_string) {
+    //take a string describing the map layer and return an array of tiles
+    //representing the map
+
+    //this could be passed into the function too
+    const letter_tile = {
+        'r': { type: 'rock', sprite: 'images/Rock.png', layer: 1, offset: true },
+        'x': { type: 'star', sprite: 'images/Star.png', layer: 1, offset: true },
+        'g': { type: 'grass', sprite: 'images/grass-block.png', layer: 0, offset: false },
+        's': { type: 'stone', sprite: 'images/stone-block.png', layer: 0, offset: false },
+        'p': { type: 'player_start', sprite: '', layer: 0, offset: false },
+        'w': { type: 'water', sprite: 'images/water-block.png', layer: 0, offset: false }
+    };
+    //strip any whitespace
+    map_string = map_string.replace(/\s+/g, '');
+
+    //here would be a good place for a sanity check of the string
+    //and error checking
+
+    let tiles = [];
+
+    for (i = 0; i < map_string.length; i++) {
+        let tile_spec = letter_tile[map_string[i]];
+        if (tile_spec) {
+            let tile = new Tile();
+            tile.sprite = tile_spec.sprite;
+            tile.setCol(i % area.cols);
+            tile.setRow(Math.floor(i / area.cols));
+            tile.offset = tile_spec.offset;
+            tile.type = tile_spec.type;
+
+            tiles.push(tile);
+        }
+    }
+    return tiles;
+}
+
+Stage.prototype.tilesAt = function (row, col) {
+    return this.fg.find(tile => tile.row() === row && tile.col() === col);
+}
+
+Stage.prototype.containsTileAt = function (row, col, type) {
+    let bg_tile = this.bg.find(tile => tile.row() === row && tile.col() === col);
+    let fg_tile = this.tilesAt(row, col);//this.fg.find(tile => tile.row() === row && tile.col() === col);
+
+    return (bg_tile && bg_tile.type === type) || (fg_tile && fg_tile.type === type);
 }
 
 Stage.prototype.render = function () {
     // Before drawing, clear existing canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const tile_image = {
-        'g': 'images/grass-block.png',
-        's': 'images/stone-block.png',
-        'w': 'images/water-block.png'
-    };
-
-    const fg_image = {
-        'r': 'images/Rock.png',
-        'x': 'images/Star.png'
-    };
-
-
-    for (row = 0; row < area.rows; row++) {
-        for (col = 0; col < area.cols; col++) {
-            const tile = this.map.charAt((row * area.cols) + col);
-            ctx.drawImage(Resources.get(tile_image[tile]), col * 101, row * 83);
-        }
-    }
-
-    for (row = 0; row < area.rows; row++) {
-        for (col = 0; col < area.cols; col++) {
-            const fg = this.rocks.charAt((row * area.cols) + col);
-            if (fg_image[fg]) {
-                ctx.drawImage(Resources.get(fg_image[fg]), col * 101, (row * 83) - (block.height / 2));
-            }
-        }
-    }
+    this.bg.forEach(tile => tile.render());
+    this.fg.forEach(tile => tile.render());
 }
-
-
 
 var Scene = function () {
     this.stage = new Stage();
-    this.player = new Player(this.stage.map, this.stage.rocks);
+    this.player = new Player();
     this.allEnemies = [new Enemy(2, 1, 1), new Enemy(0, 1.5, 1), new Enemy(5, 1.2, -1)];
 
     this.level_time = 0;
@@ -173,6 +198,8 @@ Scene.prototype.init = function () {
     // This listens for key presses and sends the keys to your
     // Player.handleInput() method. You don't need to modify this.
     let player = this.player;
+    player.tile.x = this.stage.player_start.x;
+    player.tile.y = this.stage.player_start.y;
     document.addEventListener('keyup', function (e) {
         var allowedKeys = {
             37: 'left',
@@ -186,7 +213,13 @@ Scene.prototype.init = function () {
 }
 
 Scene.prototype.update = function (dt) {
-    var that = this;
+    let player = this.player;
+    let player_tile = this.player.tile;
+    const move_player_back = (function (oldx, oldy) {
+        return function() {player_tile.x = oldx, player_tile.y = oldy};
+    }(player_tile.x, player_tile.y));
+
+
     //total time in level
     this.level_time += dt;
     //update the enemies one by one
@@ -194,25 +227,40 @@ Scene.prototype.update = function (dt) {
         enemy.update(dt);
     });
 
-    //update player 
-    this.player.update();
+    player.update();
+
+    const player_row = player_tile.row();
+    const player_col = player_tile.col();
+
+    const player_hit  = type => (this.stage.containsTileAt(player_row, player_col, type));
+
+    //reset the player if moved in ilegal way
+    const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
+    if (player_hit('water') || oorange(player_tile) || player_hit('rock')) {
+        move_player_back();
+    }
 
     //check for player/enemy collisions
     this.allEnemies.forEach(function (enemy) {
-        if ((Math.abs(that.player.x - enemy.x) < block.width) &&
-            (Math.abs(that.player.y - enemy.y) < block.height)) {
-            that.player.hit(enemy);
+        if (player_col === enemy.tile.col() &&
+            player_row === enemy.tile.row()) {
+            player.hit(enemy);
         }
     });
 
-    //check for player/star collisions
-    if (this.player.col === this.stage.star.col &&
-        this.player.row === this.stage.star.row){
+    // check for player/star collisions
+    if (player_hit('star')){
         change_scene(new Scene()); //crazy idea?
         return;
     }
+    // // check for player/star collisions
+    // if (player_col === this.stage.star.col() &&
+    //     player_row === this.stage.star.row()) {
+    //     change_scene(new Scene()); //crazy idea?
+    //     return;
+    // }
     //remove enemies which have left the screen
-    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.x < area.width) && (enemy.x > 0 - block.width - 1)));
+    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.tile.x <= grid.width + enemy.tile.width) && (enemy.tile.x >= 0 - enemy.tile.width)));
 
     //every 5s add a new enemy
     if (this.level_time > this.next_enemy) {
