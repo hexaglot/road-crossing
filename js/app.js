@@ -42,72 +42,60 @@ Tile.prototype.render = function () {
 
 // Enemies our player must avoid
 var Enemy = function (row, speed, dir) {
-    this.dir = dir;
-    this.speed = speed * dir;
-    this.row = row;
-    this.tile = new Tile();
+    const obj = new Tile();
+    obj.type = 'enemy';
+    obj.dir = dir;
+    obj.speed = speed * dir;
     if (dir > 0) {
-        this.tile.setCol(-1);
-        this.tile.sprite = 'images/enemy-bug.png';
+        obj.setCol(-1);
+        obj.sprite = 'images/enemy-bug.png';
     } else {
-        this.tile.setCol(5 + 1);
-        this.tile.sprite = 'images/enemy-bug-flipped.png';
+        obj.setCol(5 + 1);
+        obj.sprite = 'images/enemy-bug-flipped.png';
     }
-    this.tile.setRow(row);
+    obj.setRow(row);
+
+    obj.update = dt => obj.x = obj.x + (obj.width * obj.speed * dt);
+
+    return obj;
 };
 
-// Update the enemy's position, required method for game
-// Parameter: dt, a time delta between ticks
-Enemy.prototype.update = function (dt) {
-    // You should multiply any movement by the dt parameter
-    // which will ensure the game runs at the same speed for
-    // all computers.
-    this.tile.x = this.tile.x + (this.tile.width * this.speed * dt);
-};
+Player = function () {
+    const obj = new Tile();
 
-// Draw the enemy on the screen, required method for game
-Enemy.prototype.render = function () {
-    this.tile.render();
-};
+    obj.type = 'player';
+    obj.sprite = 'images/char-boy.png';
+    obj.xVel = 0;
+    obj.yVel = 0;
 
-// Now write your own player class
-// This class requires an update(), render() and
-// a handleInput() method.
-var Player = function () {
-    this.tile = new Tile();
-    this.tile.sprite = 'images/char-boy.png';
-    this.xVel = 0;
-    this.yVel = 0;
+    obj.update = function (dt) {
+        obj.x = obj.x + (obj.xVel * block.width);
+        obj.y = obj.y + (obj.yVel * block.height)
+
+        //reset the velocity
+        obj.xVel = 0;
+        obj.yVel = 0;
+    };
+
+    obj.handleInput = function (key) {
+        if (key === 'left') {
+            obj.xVel = -1;
+        } else if (key === 'right') {
+            obj.xVel = 1;
+        } else if (key === 'up') {
+            obj.yVel = -1;
+        } else if (key === 'down') {
+            obj.yVel = 1;
+        }
+    };
+
+    obj.hit = function (what) {
+        console.log('hit : ' + what);
+    };
+
+    return obj;
 }
 
-Player.prototype.update = function () {
-    this.tile.x = this.tile.x + (this.xVel * block.width);
-    this.tile.y = this.tile.y + (this.yVel * block.height)
-
-    //reset the velocity
-    this.xVel = 0;
-    this.yVel = 0;
-}
-
-Player.prototype.render = function () {
-    this.tile.render();
-}
-
-Player.prototype.handleInput = function (key) {
-    if (key === 'left') {
-        this.xVel = -1;
-    } else if (key === 'right') {
-        this.xVel = 1;
-    } else if (key === 'up') {
-        this.yVel = -1;
-    } else if (key === 'down') {
-        this.yVel = 1;
-    }
-}
-
-Player.prototype.hit = function (enemy) {
-    console.log('collide');
-}
 
 var Stage = function () {
     this.fg = this.bulidLayer(`___x_
@@ -185,8 +173,11 @@ Stage.prototype.render = function () {
 
 var Scene = function () {
     this.stage = new Stage();
-    this.player = new Player();
-    this.allEnemies = [new Enemy(2, 1, 1), new Enemy(0, 1.5, 1), new Enemy(5, 1.2, -1)];
+    this.player = Player();
+    this.allEnemies = [Enemy(2, 1, 1), Enemy(0, 1.5, 1), Enemy(5, 1.2, -1)];
+    stage = this.stage;
+    this.entities = Array.prototype.concat(stage.bg, stage.fg, this.allEnemies, [this.player]);
+    console.log(this.entities);
 
     this.level_time = 0;
     this.next_enemy = 0;
@@ -198,8 +189,8 @@ Scene.prototype.init = function () {
     // This listens for key presses and sends the keys to your
     // Player.handleInput() method. You don't need to modify this.
     let player = this.player;
-    player.tile.x = this.stage.player_start.x;
-    player.tile.y = this.stage.player_start.y;
+    player.x = this.stage.player_start.x;
+    player.y = this.stage.player_start.y;
     document.addEventListener('keyup', function (e) {
         var allowedKeys = {
             37: 'left',
@@ -214,14 +205,24 @@ Scene.prototype.init = function () {
 
 Scene.prototype.update = function (dt) {
     let player = this.player;
-    let player_tile = this.player.tile;
+    
     const move_player_back = (function (oldx, oldy) {
-        return function() {player_tile.x = oldx, player_tile.y = oldy};
-    }(player_tile.x, player_tile.y));
+        return function () { player.x = oldx, player.y = oldy };
+    }(player.x, player.y));
 
+    const contains = (row, col, type) => {
+        debugger;
+        return this.entities.find(tile => {
+                if(typeof(tile.row) !== 'function'){debugger;}
+                thisrow = tile.row();
+                thiscol = tile.col();
+                return (tile.row() === row && tile.col() === col && tile.type === type);
+        });
+    };
 
     //total time in level
     this.level_time += dt;
+
     //update the enemies one by one
     this.allEnemies.forEach(function (enemy) {
         enemy.update(dt);
@@ -229,42 +230,34 @@ Scene.prototype.update = function (dt) {
 
     player.update();
 
-    const player_row = player_tile.row();
-    const player_col = player_tile.col();
+    const player_row = player.row();
+    const player_col = player.col();
 
-    const player_hit  = type => (this.stage.containsTileAt(player_row, player_col, type));
+    const player_hit = type => contains(player_row, player_col, type);
 
-    //reset the player if moved in ilegal way
+    // reset the player if moved in ilegal way
     const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
-    if (player_hit('water') || oorange(player_tile) || player_hit('rock')) {
+    if (player_hit('water') || oorange(player) || player_hit('rock')) {
         move_player_back();
     }
 
-    //check for player/enemy collisions
-    this.allEnemies.forEach(function (enemy) {
-        if (player_col === enemy.tile.col() &&
-            player_row === enemy.tile.row()) {
-            player.hit(enemy);
-        }
-    });
+    // check for player/enemy collisions
+    if (player_hit('enemy')) {
+        player.hit('blah!');
+    }
 
     // check for player/star collisions
-    if (player_hit('star')){
+    if (player_hit('star')) {
         change_scene(new Scene()); //crazy idea?
         return;
     }
-    // // check for player/star collisions
-    // if (player_col === this.stage.star.col() &&
-    //     player_row === this.stage.star.row()) {
-    //     change_scene(new Scene()); //crazy idea?
-    //     return;
-    // }
+
     //remove enemies which have left the screen
-    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.tile.x <= grid.width + enemy.tile.width) && (enemy.tile.x >= 0 - enemy.tile.width)));
+    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.x <= grid.width + enemy.width) && (enemy.x >= 0 - enemy.width)));
 
     //every 5s add a new enemy
     if (this.level_time > this.next_enemy) {
-        this.allEnemies.push(new Enemy(2, 1, 1));
+        this.allEnemies.push(Enemy(2, 1, 1));
         this.next_enemy = this.level_time + 5;
     }
 }
