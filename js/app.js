@@ -3,7 +3,6 @@ const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
 const grid = { x: 0, y: 0, width: 505, height: 606 }
 
-
 var Tile = function () {
     this.x = 0;
     this.y = 0;
@@ -41,24 +40,56 @@ Tile.prototype.render = function () {
 }
 
 // Enemies our player must avoid
-var Enemy = function (row, speed, dir) {
+var Enemy = function () {
     const obj = new Tile();
     obj.type = 'enemy';
-    obj.dir = dir;
-    obj.speed = speed * dir;
-    if (dir > 0) {
-        obj.setCol(-1);
-        obj.sprite = 'images/enemy-bug.png';
-    } else {
-        obj.setCol(5 + 1);
-        obj.sprite = 'images/enemy-bug-flipped.png';
-    }
-    obj.setRow(row);
 
     obj.update = dt => obj.x = obj.x + (obj.width * obj.speed * dt);
 
     return obj;
 };
+
+var EnemySystem = function (enemy_spawns) {
+    const obj = {};
+    obj.time = 0;
+    obj.enemy_spawns = enemy_spawns;
+    obj.enemy_spawns.forEach(spawn => spawn.next_enemy_time = 0);
+    obj.enemies = [];
+    obj.enemy_spawns.forEach(function (spawn) {
+        spawn.interval = 101 / (Math.abs(spawn.speed) * 101);
+        spawn.index = 0;
+    });
+
+
+    obj.update = function (dt) {
+        obj.time += dt;
+        obj.enemies.forEach(enemy => enemy.update(dt));
+        //remove enemies which have left the screen
+        obj.enemies = obj.enemies.filter((enemy) => ((enemy.x <= grid.width + enemy.width) && (enemy.x >= 0 - enemy.width)));
+
+        obj.enemy_spawns.forEach(function (spawn) {
+            if (obj.time > spawn.next_enemy_time) {
+                obj.create_enemy(spawn);
+                spawn.next_enemy_time = obj.time + (spawn.pattern[spawn.index] + 1) * spawn.interval;
+                spawn.index = (spawn.index + 1) % spawn.pattern.length;
+            }
+        });
+
+        obj.create_enemy = function (spawn) {
+            let enemy = Enemy();
+            enemy.speed = spawn.speed;
+            enemy.setCol((spawn.speed > 0) ? -1 : 5 + 1);
+            enemy.setRow(spawn.row);
+            enemy.sprite = (spawn.speed > 0) ? 'images/enemy-bug.png' : 'images/enemy-bug-flipped.png';
+            obj.enemies.push(enemy);
+        }
+    }
+
+    obj.render = function () {
+        obj.enemies.forEach(enemy => enemy.render());
+    }
+    return obj;
+}
 
 Player = function () {
     const obj = new Tile();
@@ -78,55 +109,25 @@ Player = function () {
     };
 
     obj.handleInput = function (key) {
-        if (key === 'left') {
-            obj.xVel = -1;
-        } else if (key === 'right') {
-            obj.xVel = 1;
-        } else if (key === 'up') {
-            obj.yVel = -1;
-        } else if (key === 'down') {
-            obj.yVel = 1;
-        }
-    };
-
-    obj.hit = function (what) {
-        console.log('hit : ' + what);
+        obj.xVel = {'left' : -1, 'right' : 1}[key] || 0;
+        obj.yVel = {'up' : -1, 'down' : 1}[key] || 0;
     };
 
     return obj;
 }
 
-
-var Stage = function () {
-    this.fg = this.bulidLayer(`___x_
-                             r_r_r
-                             _____
-                             __r__
-                             _____
-                             p____`);
-    this.bg = this.bulidLayer(`wwwgw
-                   ggggg
-                   sssss
-                   ggggg
-                   sssss
-                   ggggg`);
-
-    this.star = this.fg.find(tile => tile.type === 'star');
-    this.player_start = this.fg.find(tile => tile.type === 'player_start');
-};
-
-Stage.prototype.bulidLayer = function (map_string) {
+var bulidLayer = function (map_string) {
     //take a string describing the map layer and return an array of tiles
     //representing the map
 
     //this could be passed into the function too
     const letter_tile = {
-        'r': { type: 'rock', sprite: 'images/Rock.png', layer: 1, offset: true },
-        'x': { type: 'star', sprite: 'images/Star.png', layer: 1, offset: true },
-        'g': { type: 'grass', sprite: 'images/grass-block.png', layer: 0, offset: false },
-        's': { type: 'stone', sprite: 'images/stone-block.png', layer: 0, offset: false },
-        'p': { type: 'player_start', sprite: '', layer: 0, offset: false },
-        'w': { type: 'water', sprite: 'images/water-block.png', layer: 0, offset: false }
+        'r': { type: 'rock', sprite: 'images/Rock.png', offset: true},
+        'x': { type: 'star', sprite: 'images/Star.png', offset: true},
+        'g': { type: 'grass', sprite: 'images/grass-block.png', offset: false},
+        's': { type: 'stone', sprite: 'images/stone-block.png', offset: false},
+        'p': { type: 'player_start', sprite: '', offset: false},
+        'w': { type: 'water', sprite: 'images/water-block.png', offset: false}
     };
     //strip any whitespace
     map_string = map_string.replace(/\s+/g, '');
@@ -152,45 +153,18 @@ Stage.prototype.bulidLayer = function (map_string) {
     return tiles;
 }
 
-Stage.prototype.tilesAt = function (row, col) {
-    return this.fg.find(tile => tile.row() === row && tile.col() === col);
-}
-
-Stage.prototype.containsTileAt = function (row, col, type) {
-    let bg_tile = this.bg.find(tile => tile.row() === row && tile.col() === col);
-    let fg_tile = this.tilesAt(row, col);//this.fg.find(tile => tile.row() === row && tile.col() === col);
-
-    return (bg_tile && bg_tile.type === type) || (fg_tile && fg_tile.type === type);
-}
-
-Stage.prototype.render = function () {
-    // Before drawing, clear existing canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    this.bg.forEach(tile => tile.render());
-    this.fg.forEach(tile => tile.render());
-}
-
 var Scene = function () {
-    this.stage = new Stage();
-    this.player = Player();
-    this.allEnemies = [Enemy(2, 1, 1), Enemy(0, 1.5, 1), Enemy(5, 1.2, -1)];
-    stage = this.stage;
-    this.entities = Array.prototype.concat(stage.bg, stage.fg, this.allEnemies, [this.player]);
-    console.log(this.entities);
+    this.player = null;
 
-    this.level_time = 0;
-    this.next_enemy = 0;
-
+    this.fg = [];
+    this.bg = [];
     this.level = 0;
+
 }
 
 Scene.prototype.init = function () {
-    // This listens for key presses and sends the keys to your
-    // Player.handleInput() method. You don't need to modify this.
-    let player = this.player;
-    player.x = this.stage.player_start.x;
-    player.y = this.stage.player_start.y;
+    let player = this.player = new Player();
+
     document.addEventListener('keyup', function (e) {
         var allowedKeys = {
             37: 'left',
@@ -201,74 +175,88 @@ Scene.prototype.init = function () {
 
         player.handleInput(allowedKeys[e.keyCode]);
     });
+
+
+    this.load_level(level_data[this.level]);
+}
+
+Scene.prototype.load_level = function (level_data) {
+    //build level
+    this.fg = bulidLayer(level_data.fg);
+    this.bg = bulidLayer(level_data.bg);
+    this.level_time = 0;
+
+    //build enemies
+    this.enemy_system = EnemySystem(level_data.enemies);
+    //very sneaky idea but doesnt work
+    for (i = 0; i < 2; i += 0.1) {
+        this.enemy_system.update(i);
+    }
+
+    //build player
+    let player = this.player;
+    let player_start = this.fg.find(tile => tile.type === 'player_start');
+    player.x = player_start.x;
+    player.y = player_start.y;
+
 }
 
 Scene.prototype.update = function (dt) {
     let player = this.player;
-    
+
     const move_player_back = (function (oldx, oldy) {
         return function () { player.x = oldx, player.y = oldy };
     }(player.x, player.y));
 
-    const contains = (row, col, type) => {
-        debugger;
-        return this.entities.find(tile => {
-                if(typeof(tile.row) !== 'function'){debugger;}
-                thisrow = tile.row();
-                thiscol = tile.col();
-                return (tile.row() === row && tile.col() === col && tile.type === type);
-        });
+    const contains = (row, col, type, list) => {
+        return list.find(tile => (tile.row() === row && tile.col() === col && tile.type === type))
     };
 
     //total time in level
     this.level_time += dt;
 
-    //update the enemies one by one
-    this.allEnemies.forEach(function (enemy) {
-        enemy.update(dt);
-    });
-
-    player.update();
+    this.enemy_system.update(dt);
+    player.update(dt);
 
     const player_row = player.row();
     const player_col = player.col();
 
-    const player_hit = type => contains(player_row, player_col, type);
+    const player_touch_fg = type => contains(player_row, player_col, type, this.fg);
+    const player_touch_bg = type => contains(player_row, player_col, type, this.bg);
+    const player_touch_enemy = type => contains(player_row, player_col, type, this.enemy_system.enemies);
 
     // reset the player if moved in ilegal way
     const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
-    if (player_hit('water') || oorange(player) || player_hit('rock')) {
+    if (player_touch_bg('water') || oorange(player) || player_touch_fg('rock')) {
         move_player_back();
     }
 
     // check for player/enemy collisions
-    if (player_hit('enemy')) {
-        player.hit('blah!');
+    if (player_touch_enemy('enemy')) {
+        // player.hit('blah!');
+        let player_start = this.fg.find(tile => tile.type === 'player_start');
+        player.x = player_start.x;
+        player.y = player_start.y;
     }
 
     // check for player/star collisions
-    if (player_hit('star')) {
-        change_scene(new Scene()); //crazy idea?
-        return;
-    }
-
-    //remove enemies which have left the screen
-    this.allEnemies = this.allEnemies.filter((enemy) => ((enemy.x <= grid.width + enemy.width) && (enemy.x >= 0 - enemy.width)));
-
-    //every 5s add a new enemy
-    if (this.level_time > this.next_enemy) {
-        this.allEnemies.push(Enemy(2, 1, 1));
-        this.next_enemy = this.level_time + 5;
+    if (player_touch_fg('star')) {
+        if (level_data.length - 1 === this.level) {
+            //weve won
+            change_scene(menu);
+        } else {
+            this.level += 1;
+            change_scene(scene); //crazy idea?
+        }
     }
 }
 
 Scene.prototype.render = function () {
-    this.stage.render();
-
-    this.allEnemies.forEach(function (enemy) {
-        enemy.render();
-    });
-
+    // this.stage.render();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    this.bg.forEach(tile => tile.render());
+    this.fg.forEach(tile => tile.render());
+    this.enemy_system.render();
     this.player.render();
 }
 
@@ -281,13 +269,17 @@ let scene = new Scene();
 
 let menu = (function () {
     let obj = {};
-
     let time = 0;
+
+    obj.init = function () {
+        //do nothing
+    }
 
     obj.update = function (dt) {
         //update here
         time += dt;
         if (time > 5) {
+            scene.level = 0;
             change_scene(scene);
         }
     };
@@ -300,3 +292,7 @@ let menu = (function () {
 
     return obj;
 }());
+
+
+
+
