@@ -19,3 +19,17 @@ TODO :
  - Check rubric
  - Complete README
  - sort git
+
+ ------
+
+ There two spaces, 'world' and 'grid'. All vectors are in grid space except the
+ enemy which lives in world space, hence its ability to smoothly walk accross
+ the screen (only the x coordinate is in world space really). Everything is
+ drawn in screen space. Collisions between things which are in grid space, like
+ the player and things which are in world space, the enemy, must be done in
+ world space for them to make sense.
+
+ Render asks object to give it the items world space coordinates which is easy
+ fo most objects, only the enemy must convert before returning.
+
+ Vectors are objects with an x and y property. Tiles have a location property which is a vector.
