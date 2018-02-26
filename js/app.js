@@ -1,7 +1,32 @@
 const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
-const grid = { x: 0, y: 0, width: 505, height: 606 }
+// const grid = { x: 0, y: 0, width: 505, height: 606 }
+
+var Grid = function(cellWidth, cellHeight){
+    this.width = cellWidth;
+    this.height = cellHeight;
+}
+
+Grid.prototype.toWorld = function (i,j){
+    return {x: i * this.width, y: j * this.height};
+}
+
+Grid.prototype.toGrid = function(x,y){
+    return {i: Math.floor(x/this.width),
+            j: Math.floor(y/this.height)};
+}
+
+const grid = new Grid(101,83);
+const unit = grid.toWorld(1,1);
+const screen = {min: grid.toWorld(0,0), max: grid.toWorld(5,6)};
+const bounds = {min: grid.toWorld(-1,-1), max: grid.toWorld(5+1,6+1)};
+
+var within = function(v,box) {
+    const size = grid.toWorld(1,1);
+    let vmax = {x: v.x + size.x, y: v.y + size.y};
+    return v.x >= box.min.x && v.y >= box.min.y && vmax.x <= box.max.x && vmax.y <= box.max.y;
+}
 
 var Tile = function () {
     this.x = 0;
@@ -34,7 +59,7 @@ Tile.prototype.render = function () {
     //bit hacky
     if (this.sprite) {
         var img = Resources.get(this.sprite);
-        let offset = this.offset ? this.height / 2 : 0;
+        let offset = this.offset ? grid.toWorld(0,0.5).y : 0; //center of image
         ctx.drawImage(img, this.x, this.y - offset);
     }
 }
@@ -65,7 +90,7 @@ var EnemySystem = function (enemy_spawns) {
         obj.time += dt;
         obj.enemies.forEach(enemy => enemy.update(dt));
         //remove enemies which have left the screen
-        obj.enemies = obj.enemies.filter((enemy) => ((enemy.x <= grid.width + enemy.width) && (enemy.x >= 0 - enemy.width)));
+        obj.enemies = obj.enemies.filter((enemy) => ((enemy.x <= 505 + enemy.width) && (enemy.x >= 0 - enemy.width)));
 
         obj.enemy_spawns.forEach(function (spawn) {
             if (obj.time > spawn.next_enemy_time) {
@@ -227,7 +252,11 @@ Scene.prototype.update = function (dt) {
 
     // reset the player if moved in ilegal way
     const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
-    if (player_touch_bg('water') || oorange(player) || player_touch_fg('rock')) {
+    
+    // if (player_touch_bg('water') || oorange(player) || player_touch_fg('rock')) {
+    //     move_player_back();
+    // }
+    if (!within(player,screen)) {
         move_player_back();
     }
 
