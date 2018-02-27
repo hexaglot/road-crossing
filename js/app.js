@@ -2,55 +2,45 @@ const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
 const block = { width: 101, height: 83 };
 const canvas = { width: 505, height: 606 };
 
+function vec(x, y) { return { x: x, y: y } };
+
 var Grid = function (cellWidth, cellHeight) {
     this.width = cellWidth;
     this.height = cellHeight;
 }
 
-Grid.prototype.toWorld = function (i, j) {
-    return { x: i * this.width, y: j * this.height };
-}
+Grid.prototype.toScreen = function (v) {
+    return vec(v.x * this.width, v.y * this.height)
+};
 
-Grid.prototype.toGrid = function (x, y) {
-    return {
-        i: Math.floor(x / this.width),
-        j: Math.floor(y / this.height)
-    };
+Grid.prototype.toGrid = function (v) {
+    return vec(v.x / this.width, v.y / this.height);
+}
+Grid.prototype.toGridSnap = function (v) {
+    return vec(Math.floor(v.x / this.width), Math.floor(v.y / this.height));
 }
 
 const grid = new Grid(101, 83);
-const unit = grid.toWorld(1, 1);
+const unit = grid.toScreen(vec(1, 1));
+
 const screen = {
-    min: { x: 0, y: 0 },
-    max: { x: 5, y: 6 }
+    min: vec(0, 0),
+    max: vec(5, 6)
 };
 
-const bounds = { min: grid.toWorld(-1, -1), max: grid.toWorld(5 + 1, 6 + 1) };
-
-var within = function (v, box) {
-    const size = grid.toWorld(1, 1);
-    let vmax = { x: v.x + size.x, y: v.y + size.y };
-    return v.x >= box.min.x && v.y >= box.min.y && vmax.x <= box.max.x && vmax.y <= box.max.y;
-}
+const bounds = {
+    min: vec(0 - 2, -1),
+    max: vec(5 + 2, 6 + 1)
+};
 
 var point_inside = function (p, b) {
     //is point p within box b?
     return p.x >= b.min.x && p.x < b.max.x && p.y >= b.min.y && p.y < b.max.y;
 }
 
-var overlap = function (a, b) {
-    //return true iff box a intersects box b else false
-    if(a.max.x <= b.min.x || a.min.x >= b.max.x) { return false};
-    if(a.max.y <= b.min.y || a.min.y >= b.max.y) { return false};
-    return true;
-}
-
-
 var Tile = function () {
-    this.x = 0;
-    this.y = 0;
+    this.loc = vec(0, 0);
     this.sprite = '';
-    this.offset = true;
 };
 
 Tile.prototype.render = function () {
@@ -59,23 +49,24 @@ Tile.prototype.render = function () {
     //bit hacky
     if (this.sprite) {
         var img = Resources.get(this.sprite);
-        let position = this.worldVec();
-        let offset = this.offset ? grid.toWorld(0, 0.5).y : 0;
-        ctx.drawImage(img, position.x, position.y - offset);
+        let screen_pos = this.toScreen();
+
+        ctx.drawImage(img, screen_pos.x, screen_pos.y);
     }
+
 }
 
-Tile.prototype.worldVec = function () {
-    return grid.toWorld(this.x, this.y);
+Tile.prototype.toScreen = function () {
+    return grid.toScreen(vec(this.loc.x, this.loc.y - 0.5));
 }
 
 // Enemies our player must avoid
 var Enemy = function () {
     const obj = new Tile();
     obj.type = 'enemy';
-    obj.worldVec = function () { return { x: this.x, y: this.y } };
+    //obj.worldVec = function () { return this.loc };
 
-    obj.update = dt => obj.x = obj.x + 101 * obj.speed * dt;
+    obj.update = dt => obj.loc.x = obj.loc.x + 1 * obj.speed * dt;
 
     return obj;
 };
@@ -96,7 +87,8 @@ var EnemySystem = function (enemy_spawns) {
         obj.time += dt;
         obj.enemies.forEach(enemy => enemy.update(dt));
         //remove enemies which have left the screen
-        obj.enemies = obj.enemies.filter(enemy => within(enemy, bounds));
+        // obj.enemies = obj.enemies.filter(enemy => enemy.loc.x >= screen.min.x -1 && enemy.loc.x <= screen.max.x);
+        obj.enemies = obj.enemies.filter(enemy => point_inside(enemy.loc, bounds));
 
         obj.enemy_spawns.forEach(function (spawn) {
             if (obj.time > spawn.next_enemy_time) {
@@ -109,8 +101,8 @@ var EnemySystem = function (enemy_spawns) {
         obj.create_enemy = function (spawn) {
             let enemy = Enemy();
             enemy.speed = spawn.speed;
-            enemy.x = (spawn.speed > 0) ? bounds.min.x : grid.toWorld(screen.max.x,0).x;
-            enemy.y = grid.toWorld(0, spawn.row).y;
+            enemy.loc.x = (spawn.speed > 0) ? screen.min.x - 1 : screen.max.x;
+            enemy.loc.y = spawn.row;
             enemy.sprite = (spawn.speed > 0) ? 'images/enemy-bug.png' : 'images/enemy-bug-flipped.png';
             obj.enemies.push(enemy);
         }
@@ -127,21 +119,24 @@ Player = function () {
 
     obj.type = 'player';
     obj.sprite = 'images/char-boy.png';
-    obj.xVel = 0;
-    obj.yVel = 0;
+    obj.vel = vec(0, 0);
 
     obj.update = function (dt) {
-        obj.x = obj.x + (obj.xVel * 1);
-        obj.y = obj.y + (obj.yVel * 1)
+        obj.loc.x = obj.loc.x + (obj.vel.x * 1);
+        obj.loc.y = obj.loc.y + (obj.vel.y * 1)
 
         //reset the velocity
-        obj.xVel = 0;
-        obj.yVel = 0;
+        obj.vel = vec(0, 0);
     };
 
     obj.handleInput = function (key) {
-        obj.xVel = { 'left': -1, 'right': 1 }[key] || 0;
-        obj.yVel = { 'up': -1, 'down': 1 }[key] || 0;
+        vels = {
+            'left': vec(-1, 0),
+            'right': vec(1, 0),
+            'up': vec(0, -1),
+            'down': vec(0, 1)
+        };
+        obj.vel = vels[key] || vec(0, 0);
     };
 
     return obj;
@@ -173,10 +168,14 @@ var bulidLayer = function (map_string) {
         if (tile_spec) {
             let tile = new Tile();
             tile.sprite = tile_spec.sprite;
-            tile.x = i % area.cols;
-            tile.y = Math.floor(i / area.cols);
-            tile.offset = tile_spec.offset;
+            tile.loc.x = i % area.cols;
+            tile.loc.y = Math.floor(i / area.cols);
             tile.type = tile_spec.type;
+            if(!tile_spec.offset){ 
+                tile.toScreen = () => grid.toScreen(tile.loc);
+            } else {
+                tile.toScreen = () => grid.toScreen(vec(tile.loc.x, tile.loc.y - 0.5));
+            };
 
             tiles.push(tile);
         }
@@ -227,17 +226,16 @@ Scene.prototype.load_level = function (level_data) {
     //build player
     let player = this.player;
     let player_start = this.fg.find(tile => tile.type === 'player_start');
-    player.x = player_start.x;
-    player.y = player_start.y;
-
+    player.loc.x = player_start.loc.x;
+    player.loc.y = player_start.loc.y;
 }
 
 Scene.prototype.update = function (dt) {
     let player = this.player;
 
-    const move_player_back = (function (oldx, oldy) {
-        return function () { player.x = oldx, player.y = oldy };
-    }(player.x, player.y));
+    const move_player_back = (function (x, y) {
+        return function () { player.loc.x = x, player.loc.y = y };
+    }(player.loc.x, player.loc.y));
 
     const same_square = function (a, b) {
         let result = a.x === b.x && a.y === b.y;
@@ -245,7 +243,7 @@ Scene.prototype.update = function (dt) {
     }
 
     const contains = (location, type, list) => {
-        return list.find(tile => (same_square(tile, location) && tile.type === type))
+        return list.find(tile => (same_square(tile.loc, location) && tile.type === type))
     };
 
     //total time in level
@@ -254,29 +252,30 @@ Scene.prototype.update = function (dt) {
     this.enemy_system.update(dt);
     player.update(dt);
 
-    const player_touch_fg = type => contains(player, type, this.fg);
-    const player_touch_bg = type => contains(player, type, this.bg);
+    const player_touch_fg = type => contains(player.loc, type, this.fg);
+    const player_touch_bg = type => contains(player.loc, type, this.bg);
 
-    // reset the player if moved in ilegal way
-    //const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
+    // // reset the player if moved in ilegal way
+    // //const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
 
     if (player_touch_bg('water') || player_touch_fg('rock')) {
         move_player_back();
     }
-    if (!point_inside(player, screen)) {
+
+    if (!point_inside(player.loc, screen)) {
         move_player_back();
+        console.log('exit!');
     }
     that = this;
+
     // check for player/enemy collisions
     this.enemy_system.enemies.forEach(function (enemy) {
-        // let player_box = {min: grid.toWorld(player.x, player.y), max: grid.toWorld(player.x + 1, player.y + 1)};
-        // let enemy_box = {min: {x:enemy.x, y: enemy.y}, max:{x:enemy.x + 101, y: enemy.y + 83}};
-        let same_line = player.y === grid.toGrid(0,enemy.y).j;
-        let x_distance = Math.abs(grid.toWorld(player.x,0).x - enemy.x);
-        if (same_line &&  x_distance < (0.75 * 101)) {
+        let same_line = player.loc.y === enemy.loc.y;
+        let x_distance = Math.abs(player.loc.x - enemy.loc.x);
+        if (same_line && x_distance < 0.5) {
             let player_start = that.fg.find(tile => tile.type === 'player_start');
-            player.x = player_start.x;
-            player.y = player_start.y;
+            player.loc.x = player_start.loc.x;
+            player.loc.y = player_start.loc.y;
         }
     });
 
