@@ -55,6 +55,16 @@ var Enemy = function (loc, speed) {
     return obj;
 };
 
+var PeriodicTimer = function (delay, func) {
+    let time = 0;
+    return dt => {
+        if (time >= delay) {
+            time = time - delay; //so we don't lose any fractions of time
+            func();
+        }
+    }
+}
+
 var EnemyEmitter = function (spec) {
     var emitter = {};
     let x = (spec.speed > 0) ? screen.min.x - 1 : screen.max.x;
@@ -63,15 +73,16 @@ var EnemyEmitter = function (spec) {
     emitter.speed = spec.speed;
     emitter.interval = 1 / Math.abs(spec.speed);
     emitter.index = 0;
-    emitter.pattern = spec.pattern;
+    emitter.pattern = spec.pattern.map(n => (n * emitter.interval) + 1);
     let time = 0;
     emitter.update = function (dt, func) {
         time += dt;
-        if (time > (emitter.pattern[emitter.index] + 1) * emitter.interval) {
+        if (time > emitter.pattern[emitter.index]) {
             func(emitter);
-            time = 0;
+            time = 0;//time - emitter.pattern[emitter.index];
             emitter.index = (emitter.index + 1) % emitter.pattern.length;
         }
+
     }
 
     return emitter;
@@ -105,6 +116,21 @@ Player = function () {
     return obj;
 }
 
+
+var tileFromSpec = function (tile_spec) {
+    //take a spec and return an object
+    let tile = new Tile();
+    tile.sprite = tile_spec.sprite;
+    tile.type = tile_spec.type;
+    if (!tile_spec.offset) {
+        tile.toScreen = () => grid.toScreen(tile.loc);
+    } else {
+        tile.toScreen = () => grid.toScreen(vec(tile.loc.x, tile.loc.y - 0.5));
+    };
+
+    return tile;
+}
+
 var bulidLayer = function (map_string) {
     //take a string describing the map layer and return an array of tiles
     //representing the map
@@ -129,18 +155,11 @@ var bulidLayer = function (map_string) {
 
     for (i = 0; i < map_string.length; i++) {
         let tile_spec = letter_tile[map_string[i]];
+
         if (tile_spec) {
-            let tile = new Tile();
-            tile.sprite = tile_spec.sprite;
+            let tile = tileFromSpec(tile_spec);
             tile.loc.x = i % cols;
             tile.loc.y = Math.floor(i / cols);
-            tile.type = tile_spec.type;
-            if (!tile_spec.offset) {
-                tile.toScreen = () => grid.toScreen(tile.loc);
-            } else {
-                tile.toScreen = () => grid.toScreen(vec(tile.loc.x, tile.loc.y - 0.5));
-            };
-
             tiles.push(tile);
         }
     }
@@ -217,7 +236,9 @@ Scene.prototype.update = function (dt) {
     this.enemies.forEach(enemy => enemy.update(dt));
 
     //remove enemies which have left the screen
-    this.enemies = this.enemies.filter(enemy => enemy.loc.x >= screen.min.x - 1 && enemy.loc.x <= screen.max.x);
+    this.enemies = this.enemies.filter(enemy =>
+        enemy.loc.x >= screen.min.x - 1 &&
+        enemy.loc.x <= screen.max.x);
 
     this.emitters.forEach(function (emitter) {
         emitter.update(dt, emitter =>
@@ -226,7 +247,8 @@ Scene.prototype.update = function (dt) {
 
     player.update(dt);
 
-    if (contains(player.loc, 'water', this.bg) || contains(player.loc, 'rock', this.fg)) {
+    if (contains(player.loc, 'water', this.bg) ||
+        contains(player.loc, 'rock', this.fg)) {
         move_player_back();
     }
 
@@ -249,7 +271,7 @@ Scene.prototype.update = function (dt) {
     this.enemies.forEach(function (enemy) {
         let same_line = player.loc.y === enemy.loc.y;
         let x_distance = Math.abs(player.loc.x - enemy.loc.x);
-        if (same_line && x_distance < 0.5) {
+        if (same_line && x_distance < 0.65) {
             let player_start = that.fg.find(tile => tile.type === 'player_start');
             player.loc.x = player_start.loc.x;
             player.loc.y = player_start.loc.y;
