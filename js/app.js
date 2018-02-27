@@ -1,7 +1,3 @@
-const area = { width: 5 * 101, height: 6 * 83, rows: 6, cols: 5 }
-const block = { width: 101, height: 83 };
-const canvas = { width: 505, height: 606 };
-
 function vec(x, y) { return { x: x, y: y } };
 
 var Grid = function (cellWidth, cellHeight) {
@@ -16,21 +12,12 @@ Grid.prototype.toScreen = function (v) {
 Grid.prototype.toGrid = function (v) {
     return vec(v.x / this.width, v.y / this.height);
 }
-Grid.prototype.toGridSnap = function (v) {
-    return vec(Math.floor(v.x / this.width), Math.floor(v.y / this.height));
-}
 
 const grid = new Grid(101, 83);
-const unit = grid.toScreen(vec(1, 1));
 
 const screen = {
     min: vec(0, 0),
     max: vec(5, 6)
-};
-
-const bounds = {
-    min: vec(0 - 2, -1),
-    max: vec(5 + 2, 6 + 1)
 };
 
 var point_inside = function (p, b) {
@@ -44,16 +31,11 @@ var Tile = function () {
 };
 
 Tile.prototype.render = function () {
-    //we use an offset of half height to render characters
-    //bg use an offset of 0
-    //bit hacky
     if (this.sprite) {
         var img = Resources.get(this.sprite);
         let screen_pos = this.toScreen();
-
         ctx.drawImage(img, screen_pos.x, screen_pos.y);
     }
-
 }
 
 Tile.prototype.toScreen = function () {
@@ -61,57 +43,38 @@ Tile.prototype.toScreen = function () {
 }
 
 // Enemies our player must avoid
-var Enemy = function () {
+var Enemy = function (loc, speed) {
     const obj = new Tile();
     obj.type = 'enemy';
-    //obj.worldVec = function () { return this.loc };
-
+    obj.loc.x = loc.x;
+    obj.loc.y = loc.y;
+    obj.speed = speed;
+    obj.sprite = (obj.speed > 0) ? 'images/enemy-bug.png' : 'images/enemy-bug-flipped.png';
     obj.update = dt => obj.loc.x = obj.loc.x + 1 * obj.speed * dt;
 
     return obj;
 };
 
-var EnemySystem = function (enemy_spawns) {
-    const obj = {};
-    obj.time = 0;
-    obj.enemy_spawns = enemy_spawns;
-    obj.enemy_spawns.forEach(spawn => spawn.next_enemy_time = 0);
-    obj.enemies = [];
-    obj.enemy_spawns.forEach(function (spawn) {
-        spawn.interval = 101 / (Math.abs(spawn.speed) * 101);
-        spawn.index = 0;
-    });
-
-
-    obj.update = function (dt) {
-        obj.time += dt;
-        obj.enemies.forEach(enemy => enemy.update(dt));
-        //remove enemies which have left the screen
-        // obj.enemies = obj.enemies.filter(enemy => enemy.loc.x >= screen.min.x -1 && enemy.loc.x <= screen.max.x);
-        obj.enemies = obj.enemies.filter(enemy => point_inside(enemy.loc, bounds));
-
-        obj.enemy_spawns.forEach(function (spawn) {
-            if (obj.time > spawn.next_enemy_time) {
-                obj.create_enemy(spawn);
-                spawn.next_enemy_time = obj.time + (spawn.pattern[spawn.index] + 1) * spawn.interval;
-                spawn.index = (spawn.index + 1) % spawn.pattern.length;
-            }
-        });
-
-        obj.create_enemy = function (spawn) {
-            let enemy = Enemy();
-            enemy.speed = spawn.speed;
-            enemy.loc.x = (spawn.speed > 0) ? screen.min.x - 1 : screen.max.x;
-            enemy.loc.y = spawn.row;
-            enemy.sprite = (spawn.speed > 0) ? 'images/enemy-bug.png' : 'images/enemy-bug-flipped.png';
-            obj.enemies.push(enemy);
+var EnemyEmitter = function (spec) {
+    var emitter = {};
+    let x = (spec.speed > 0) ? screen.min.x - 1 : screen.max.x;
+    let y = spec.row;
+    emitter.loc = vec(x, y);
+    emitter.speed = spec.speed;
+    emitter.interval = 1 / Math.abs(spec.speed);
+    emitter.index = 0;
+    emitter.pattern = spec.pattern;
+    let time = 0;
+    emitter.update = function (dt, func) {
+        time += dt;
+        if (time > (emitter.pattern[emitter.index] + 1) * emitter.interval) {
+            func(emitter);
+            time = 0;
+            emitter.index = (emitter.index + 1) % emitter.pattern.length;
         }
     }
 
-    obj.render = function () {
-        obj.enemies.forEach(enemy => enemy.render());
-    }
-    return obj;
+    return emitter;
 }
 
 Player = function () {
@@ -162,16 +125,17 @@ var bulidLayer = function (map_string) {
     //and error checking
 
     let tiles = [];
+    const cols = screen.max.x;
 
     for (i = 0; i < map_string.length; i++) {
         let tile_spec = letter_tile[map_string[i]];
         if (tile_spec) {
             let tile = new Tile();
             tile.sprite = tile_spec.sprite;
-            tile.loc.x = i % area.cols;
-            tile.loc.y = Math.floor(i / area.cols);
+            tile.loc.x = i % cols;
+            tile.loc.y = Math.floor(i / cols);
             tile.type = tile_spec.type;
-            if(!tile_spec.offset){ 
+            if (!tile_spec.offset) {
                 tile.toScreen = () => grid.toScreen(tile.loc);
             } else {
                 tile.toScreen = () => grid.toScreen(vec(tile.loc.x, tile.loc.y - 0.5));
@@ -188,6 +152,8 @@ var Scene = function () {
 
     this.fg = [];
     this.bg = [];
+    this.enemies = [];
+    this.emitters = null;
     this.level = 0;
 
 }
@@ -214,13 +180,14 @@ Scene.prototype.load_level = function (level_data) {
     //build level
     this.fg = bulidLayer(level_data.fg);
     this.bg = bulidLayer(level_data.bg);
+    this.emitters = level_data.enemies.map(EnemyEmitter);
     this.level_time = 0;
 
     //build enemies
-    this.enemy_system = EnemySystem(level_data.enemies);
+    //this.enemy_system = EnemySystem(level_data.enemies);
     //very sneaky idea but doesnt work
     for (i = 0; i < 2; i += 0.1) {
-        this.enemy_system.update(i);
+        this.update(i);
     }
 
     //build player
@@ -231,57 +198,40 @@ Scene.prototype.load_level = function (level_data) {
 }
 
 Scene.prototype.update = function (dt) {
+    that = this;
     let player = this.player;
 
     const move_player_back = (function (x, y) {
         return function () { player.loc.x = x, player.loc.y = y };
     }(player.loc.x, player.loc.y));
 
-    const same_square = function (a, b) {
-        let result = a.x === b.x && a.y === b.y;
-        return result;
-    }
-
-    const contains = (location, type, list) => {
-        return list.find(tile => (same_square(tile.loc, location) && tile.type === type))
+    const contains = (loc, type, list) => {
+        return list.find(tile =>
+            (tile.loc.x === loc.x && tile.loc.y === loc.y) && tile.type === type)
     };
 
     //total time in level
     this.level_time += dt;
 
-    this.enemy_system.update(dt);
-    player.update(dt);
+    // this.enemy_system.update(dt);
+    this.enemies.forEach(enemy => enemy.update(dt));
 
-    const player_touch_fg = type => contains(player.loc, type, this.fg);
-    const player_touch_bg = type => contains(player.loc, type, this.bg);
+    //remove enemies which have left the screen
+    this.enemies = this.enemies.filter(enemy => enemy.loc.x >= screen.min.x - 1 && enemy.loc.x <= screen.max.x);
 
-    // // reset the player if moved in ilegal way
-    // //const oorange = tile => (tile.x + tile.width > area.width || tile.x < 0) || (tile.y + tile.height > area.height || tile.y < 0);
-
-    if (player_touch_bg('water') || player_touch_fg('rock')) {
-        move_player_back();
-    }
-
-    if (!point_inside(player.loc, screen)) {
-        move_player_back();
-        console.log('exit!');
-    }
-    that = this;
-
-    // check for player/enemy collisions
-    this.enemy_system.enemies.forEach(function (enemy) {
-        let same_line = player.loc.y === enemy.loc.y;
-        let x_distance = Math.abs(player.loc.x - enemy.loc.x);
-        if (same_line && x_distance < 0.5) {
-            let player_start = that.fg.find(tile => tile.type === 'player_start');
-            player.loc.x = player_start.loc.x;
-            player.loc.y = player_start.loc.y;
-        }
+    this.emitters.forEach(function (emitter) {
+        emitter.update(dt, emitter =>
+            that.enemies.push(Enemy(emitter.loc, emitter.speed)));
     });
 
+    player.update(dt);
+
+    if (contains(player.loc, 'water', this.bg) || contains(player.loc, 'rock', this.fg)) {
+        move_player_back();
+    }
 
     // check for player/star collisions
-    if (player_touch_fg('star')) {
+    if (contains(player.loc, 'star', this.fg)) {
         if (level_data.length - 1 === this.level) {
             //weve won
             change_scene(menu);
@@ -290,14 +240,32 @@ Scene.prototype.update = function (dt) {
             change_scene(scene); //crazy idea?
         }
     }
+
+    if (!point_inside(player.loc, screen)) {
+        move_player_back();
+    }
+
+    // check for player/enemy collisions
+    this.enemies.forEach(function (enemy) {
+        let same_line = player.loc.y === enemy.loc.y;
+        let x_distance = Math.abs(player.loc.x - enemy.loc.x);
+        if (same_line && x_distance < 0.5) {
+            let player_start = that.fg.find(tile => tile.type === 'player_start');
+            player.loc.x = player_start.loc.x;
+            player.loc.y = player_start.loc.y;
+        }
+    });
 }
 
 Scene.prototype.render = function () {
     // this.stage.render();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const min = grid.toScreen(screen.min);
+    const max = grid.toScreen(screen.max);
+
+    ctx.clearRect(min.x, min.y, max.x, max.y);
     this.bg.forEach(tile => tile.render());
     this.fg.forEach(tile => tile.render());
-    this.enemy_system.render();
+    this.enemies.forEach(enemy => enemy.render());
     this.player.render();
 }
 
