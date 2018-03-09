@@ -1,35 +1,58 @@
-frontend-nanodegree-arcade-game
-===============================
+'Frogger' style arcade game
+===========================
 
-Students should use this [rubric](https://review.udacity.com/#!/projects/2696458597/rubric) for self-checking their submission. Make sure the functions you write are **object-oriented** - either class functions (like Player and Enemy) or class prototype functions such as Enemy.prototype.checkCollisions, and that the keyword 'this' is used appropriately within your class and class prototype functions to refer to the object the function is called upon. Also be sure that the **readme.md** file is updated with your instructions on both how to 1. Run and 2. Play your arcade game.
+This is an object oriented implementation of a Frogger style arcade game using HTML5 canvas object.
 
-For detailed instructions on how to get started, check out this [guide](https://docs.google.com/document/d/1v01aScPjSWCCWQLIpFqvg3-vXLH2e8_SZQKC8jNO0Dc/pub?embedded=true).
+The aim of the game is to get the player to the star without touching the enemy
+bugs. You have three lives to complete all the levels.
+
+engine.js has been heavily modified to make adding menus and multiple levels
+simple. The fixed allEnemies and player variables have been removed as the fixed
+structure made it harder to extend the game. As a result of theses changes
+Engine.js now passes most of its functionality on to Objects defined in app.js.
+The game switches between Scene and Menu objects which implement different game
+states.
+
+There is a Player and Enemy object - both quite simple. There are a few helper
+objects:
+
+- Vec - a simple 2D vector object which really only keeps an x and y
+value
+
+- Sprite - holds an image with a position, and can draw itself. It is
+used for most game objects 
+
+- Animation, Tween, Timer objects - these implement
+a simple tweening system isnpired by the flux library use in Lua's Love game
+system. I had planed to use this to add more effects to the game but actually
+they are probably not really needed. The timer is used to spawn vehicles in
+patterns.
+
+- Level object is a conainer for map data. It holds the position of background
+and foreground sprites, can load itself from the primitive level descriptions
+used to design the levels. It uses the EnemyEmitter object to describe where and
+how often enemy vehicles are created. It can also tell you if a player can step
+on a square.
+
+- Menu class presents the ugly, simplistic menus. If I had more time I would
+focus on making these more attractive.
+
+- Scene object stores the game objects and logic. Most of the work is done in
+the update method - player movement and enemy collisions are both handled here.
+It made more sense to put collision response outside the player object as it
+seperates concerns better.
+
+If I had more time I would:
+
+- Make better use of the tween object. Few animations are actually implemented
+and its not pulling its weight atm. 
+- Tidy the game engine state management, init() should probably be called enter() and a leave() function would be handy
+id. 
+- Improve the menus, they are ugly and dont really add much to the
+experience. 
+- Make some better levels, or maybe change the player movement to
+make the game a bit more fun. 
+- split things into more than one file!
+- Improve the documentation quite a bit.
 
 
-TODO : 
- - add Map object which holds the background and has a render function, maybe an update function too?
- - get the engine to call this instead of doing it itself
- - Modify the player to account for water etc.
- - add a few other objects, Gem, Star, Heart.
- - tidy up the collision function to account for new objects 
- - Add a 'scene' or something which is a state machine to handle intro, playing a level
- - Add more than one map
- - Add a hud
- - Add a pause game
- - Check rubric
- - Complete README
- - sort git
-
- ------
-
- There two spaces, 'world' and 'grid'. All vectors are in grid space except the
- enemy which lives in world space, hence its ability to smoothly walk accross
- the screen (only the x coordinate is in world space really). Everything is
- drawn in screen space. Collisions between things which are in grid space, like
- the player and things which are in world space, the enemy, must be done in
- world space for them to make sense.
-
- Render asks object to give it the items world space coordinates which is easy
- fo most objects, only the enemy must convert before returning.
-
- Vectors are objects with an x and y property. Tiles have a location property which is a vector.

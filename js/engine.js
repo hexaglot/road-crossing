@@ -28,7 +28,7 @@ var Engine = (function (global) {
     canvas.height = 606;
     doc.body.appendChild(canvas);
 
-    let current_scene = scene;
+    let current_scene = menu;
 
     global.change_scene = function (to) {
         to.init();
@@ -71,7 +71,6 @@ var Engine = (function (global) {
      * game loop.
      */
     function init() {
-        //we are only going to call reset if its been declared
         current_scene.reset();
         current_scene.init();
         lastTime = Date.now();
@@ -91,7 +90,7 @@ var Engine = (function (global) {
         'images/char-boy.png',
         'images/Rock.png',
         'images/Star.png',
-        'images/char-boy-box.png'
+        'images/Heart.png'
     ]);
     Resources.onReady(init);
 
