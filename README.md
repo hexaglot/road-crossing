@@ -1,6 +1,10 @@
 'Frogger' style arcade game
 ===========================
 
+[Play a hosted version of the game](https://hexaglot.github.io/road-crossing/index.html)
+
+To run the game locally, clone the repository and open inde.html.
+
 This is an object oriented implementation of a Frogger style arcade game using HTML5 canvas object.
 
 The aim of the game is to get the player to the star without touching the enemy
