@@ -5,7 +5,7 @@ A JavaScript arcade game in the style of Frogger.
 
 [Play a hosted version of the game](https://hexaglot.github.io/road-crossing/index.html)
 
-![screenshot](screenshot.png "Screenshot")
+![screenshot](screenshot.jpg "Screenshot")
 
 To run the game locally, clone the repository and open index.html.
 
