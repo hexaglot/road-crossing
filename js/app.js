@@ -1,23 +1,29 @@
+/* jshint esversion: 6*/
+/*jslint es6:true*/
+
 //some constants
 const COLS = 5;
 const ROWS = 6;
 const WIDTH = 101;
 const HEIGHT = 83;
 
-//Two easing functions for tweening 
-let SMOOTHSTEP = t => t * t * (3 - 2 * t);
+//Two easing functions for tweening
+let SMOOTHSTEP = (t) => t * t * (3 - 2 * t);
 
 //A 2D vector
 const Vec = function (x, y) {
+    'use strict';
     this.x = x;
     this.y = y;
 }
 
 Vec.prototype.add = function (a) {
+    'use strict';
     return new Vec(this.x + a.x, this.y + a.y);
 }
 
 Vec.prototype.equals = function (a) {
+    'use strict';
     return this.x === a.x && this.y === a.y;
 }
 
@@ -28,12 +34,14 @@ const Sprite = function (pos, image) {
 }
 
 Sprite.prototype.draw = function () {
+    'use strict';
     const image = Resources.get(this.image);
     ctx.drawImage(image, this.pos.x * WIDTH, this.pos.y * HEIGHT - (HEIGHT / 2));
 }
 
 //an Enemy vehicle
 const Enemy = function (pos, speed) {
+    'use strict';
     this.speed = speed;
     const image = speed > 0 ? 'images/enemy-bug.png' : 'images/enemy-bug-flipped.png';
     this.sprite = new Sprite(pos, image);
@@ -232,8 +240,8 @@ Menu.prototype.init = function () {
     const textMetric = ctx.measureText(this.message);
     const textX = (ctx.canvas.width / 2) - (textMetric.width / 2);
     const textY = (ctx.canvas.height / 2);
-    this.pos = { y: 10, x: textX};
-    this.animation.add(new Tween(this.pos, { y: textY}, 1, SMOOTHSTEP));
+    this.pos = { y: 10, x: textX };
+    this.animation.add(new Tween(this.pos, { y: textY }, 1, SMOOTHSTEP));
 }
 
 Menu.prototype.update = function (dt) {
@@ -245,7 +253,7 @@ Menu.prototype.render = function () {
     ctx.save();
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.fillStyle = '#5fc148';
-    ctx.fillRect(0,0,606,505,);
+    ctx.fillRect(0, 0, 606, 505, );
     ctx.fillStyle = '#fff';
     ctx.textBaseline = 'bottom';
     ctx.fillText(this.message, this.pos.x, this.pos.y);
@@ -290,8 +298,8 @@ Scene.prototype.init = function () {
     });
 
     //fast forward time 5 seconds - this gives the world a head start on the player
-    for(j = 0; j < 60 * 5; j++) {
-        this.update(1/60);
+    for (j = 0; j < 60 * 5; j++) {
+        this.update(1 / 60);
     }
 
 };
